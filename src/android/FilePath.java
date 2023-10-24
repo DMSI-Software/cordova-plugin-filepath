@@ -50,7 +50,12 @@ public class FilePath extends CordovaPlugin {
     public static final String READ = Manifest.permission.READ_EXTERNAL_STORAGE;
 
     protected void getReadPermission(int requestCode) {
-        PermissionHelper.requestPermission(this, requestCode, READ);
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            String [] permissions = {Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO};
+            PermissionHelper.requestPermissions(this, requestCode, permissions);
+        } else {
+            PermissionHelper.requestPermission(this, requestCode, Manifest.permission.READ_EXTERNAL_STORAGE);  
+        }
     }
 
     public void initialize(CordovaInterface cordova, final CordovaWebView webView) {
@@ -71,11 +76,22 @@ public class FilePath extends CordovaPlugin {
         this.uriStr = args.getString(0);
 
         if (action.equals("resolveNativePath")) {
-            if (PermissionHelper.hasPermission(this, READ)) {
-                resolveNativePath();
-            }
-            else {
-                getReadPermission(READ_REQ_CODE);
+            if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                String permissionNativePath = Manifest.permission.READ_MEDIA_IMAGES;
+                if (PermissionHelper.hasPermission(this, permissionNativePath)) {
+                    resolveNativePath();
+                }
+                else {
+                    getReadPermission(READ_REQ_CODE);
+                }
+            } else {
+                String permissionNativePath = Manifest.permission.READ_EXTERNAL_STORAGE;
+                if (PermissionHelper.hasPermission(this, permissionNativePath)) {
+                    resolveNativePath();
+                }
+                else {
+                    getReadPermission(READ_REQ_CODE);
+                }
             }
 
             return true;
@@ -302,20 +318,6 @@ public class FilePath extends CordovaPlugin {
     }
 
     /**
-     * sometimes in raw type, the second part is a valid filepath
-     *
-     * @param rawPath The raw path
-     */
-    private static String getRawFilepath(String rawPath) {
-        final String[] split = rawPath.split(":");
-        if (fileExists(split[1])) {
-            return split[1];
-        }
-
-        return "";
-    }
-
-    /**
      * Get a file path from a Uri. This will get the the path for Storage Access
      * Framework Documents, as well as the _data field for the MediaStore and
      * other file-based ContentProviders.<br>
@@ -375,13 +377,6 @@ public class FilePath extends CordovaPlugin {
                 }
                 //
                 final String id = DocumentsContract.getDocumentId(uri);
-
-                // sometimes in raw type, the second part is a valid filepath
-                final String rawFilepath = getRawFilepath(id);
-                if (rawFilepath != "") {
-                    return rawFilepath;
-                }
-
                 String[] contentUriPrefixesToTry = new String[]{
                         "content://downloads/public_downloads",
                         "content://downloads/my_downloads"
